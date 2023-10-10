@@ -340,6 +340,34 @@ public class Analyzer {
 
     public void buildAndShowCallGraph() throws IOException {
 
+        buildCallGraph();
+
+        String css = "text-alignment: at-right; text-padding: 3px, 2px; text-background-mode: rounded-box; text-background-color: #EB2; text-color: #222;";
+
+        for (Node node : this.callGraph.nodes().collect(Collectors.toList())) {
+            //node.setAttribute("ui.style", "shape:circle; fill-color: cyan;size: 30px; text-alignment: center;");
+            node.setAttribute("ui.style", css);
+            node.setAttribute("ui.label", node.getId());
+            if (!node.neighborNodes().findAny().isPresent())
+                node.setAttribute("ui.hide");
+
+        }
+
+        for (Edge edge : this.callGraph.edges().collect(Collectors.toList())) {
+            edge.setAttribute("layout.weight", 20.0);
+        }
+
+        callGraph.setAttribute("ui.quality");
+        callGraph.setAttribute("ui.style", "padding: 40px;");
+
+        LinLog layout = new LinLog();
+        layout.setStabilizationLimit(0.001); // Valeur de stabilisation
+        layout.setQuality(1.0); // Qualité de la disposition
+        callGraph.display().enableAutoLayout(layout);
+
+    }
+
+    private void buildCallGraph() throws IOException {
         for (File fileEntry : javaFiles) {
             String content = FileUtils.readFileToString(fileEntry, StandardCharsets.UTF_8);
             CompilationUnit ast = parse(content.toCharArray());
@@ -371,30 +399,6 @@ public class Analyzer {
             }
 
         }
-
-        String css = "text-alignment: at-right; text-padding: 3px, 2px; text-background-mode: rounded-box; text-background-color: #EB2; text-color: #222;";
-
-        for (Node node : this.callGraph.nodes().collect(Collectors.toList())) {
-            //node.setAttribute("ui.style", "shape:circle; fill-color: cyan;size: 30px; text-alignment: center;");
-            node.setAttribute("ui.style", css);
-            node.setAttribute("ui.label", node.getId());
-            if (!node.neighborNodes().findAny().isPresent())
-                node.setAttribute("ui.hide");
-
-        }
-
-        for (Edge edge : this.callGraph.edges().collect(Collectors.toList())) {
-            edge.setAttribute("layout.weight", 20.0);
-        }
-
-        callGraph.setAttribute("ui.quality");
-        callGraph.setAttribute("ui.style", "padding: 40px;");
-
-        LinLog layout = new LinLog();
-        layout.setStabilizationLimit(0.001); // Valeur de stabilisation
-        layout.setQuality(1.0); // Qualité de la disposition
-            callGraph.display().enableAutoLayout(layout);
-
     }
 
     private String getFullMethodName(MethodInvocation mi) {
@@ -442,10 +446,16 @@ public class Analyzer {
         }
     }
 
-    public float calculateCouplingMetric() {
-        float result = 0.0f;
+    public int calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
+        int couplingCounter = 0;
 
-        return result;
+        buildCallGraph();
+
+        for(Edge e: callGraph.edges().collect(Collectors.toList()))
+            if(e.getNode0().getId().startsWith(classNameA + ".") && e.getNode1().getId().startsWith(classNameB + "."))
+                couplingCounter++;
+
+        return couplingCounter;
     }
 
     public void buildWeightedCouplingGraph() {

@@ -36,7 +36,7 @@ public class MainCLI extends AbstractCLI {
             }
             analyzer = Analyzer.getInstance(projectPath);
 
-            for (int i = 0; i <= 14; i++)
+            for (int i = 0; i <= 5; i++)
                 validChoices.add(String.valueOf(i));
 
             MainCLI mainCLI = new MainCLI();
@@ -52,6 +52,9 @@ public class MainCLI extends AbstractCLI {
         System.out.println();
         System.out.print("---------------------------------\n");
         stringBuilder.append(String.format("%s. QUIT", QUIT));
+        stringBuilder.append("\n1. Couplage entre deux classe A et B.");
+        stringBuilder.append("\n2. Générer le graphe de couplage pondéré.");
+        stringBuilder.append("\n3. Visualiser le graphe d'appel.");
         stringBuilder.append("\n---------------------------------");
 
         System.out.println(stringBuilder);
@@ -71,5 +74,26 @@ public class MainCLI extends AbstractCLI {
             return;
         }
 
+        switch (userInput) {
+            case "1":
+                handleChoice1();
+                break;
+
+            case "2":
+                analyzer.buildAndShowCallGraph();
+                break;
+        }
+
+    }
+
+    private void handleChoice1() throws IOException {
+        System.out.print("Nom de la classe A : ");
+        String classNameA = inputReader.readLine();
+
+        System.out.print("Nom de la classe B : ");
+        String classNameB = inputReader.readLine();
+
+
+        System.out.printf("Le couplage entre %s et %s vaut %d. %n", classNameA, classNameB, analyzer.calculateCouplingMetric(classNameA, classNameB));
     }
 }
