@@ -446,16 +446,18 @@ public class Analyzer {
         }
     }
 
-    public int calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
-        int couplingCounter = 0;
+    public float calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
+        float couplingCounter = 0;
 
         buildCallGraph();
+
+        float totalCoupling = callGraph.edges().count();
 
         for(Edge e: callGraph.edges().collect(Collectors.toList()))
             if(e.getNode0().getId().startsWith(classNameA + ".") && e.getNode1().getId().startsWith(classNameB + "."))
                 couplingCounter++;
 
-        return couplingCounter;
+        return couplingCounter / totalCoupling;
     }
 
     public void buildWeightedCouplingGraph() {

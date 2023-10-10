@@ -14,7 +14,7 @@ import java.util.Set;
 public class MainCLI extends AbstractCLI {
 
     private static Analyzer analyzer;
-    private static Set<String> validChoices = new LinkedHashSet<>();
+    private static final Set<String> validChoices = new LinkedHashSet<>();
 
     public MainCLI() {
     }
@@ -34,6 +34,7 @@ public class MainCLI extends AbstractCLI {
                 System.err.println("Le dossier est introuvable");
                 return;
             }
+
             analyzer = Analyzer.getInstance(projectPath);
 
             for (int i = 0; i <= 5; i++)
@@ -64,12 +65,12 @@ public class MainCLI extends AbstractCLI {
     protected void processUserInput(String userInput) throws IOException {
 
         if (userInput.equals(QUIT)) {
-            System.out.println("À très bientôt");
+            System.out.println("À très bientôt !");
             return;
         }
 
         if(!validChoices.contains(userInput)) {
-            System.out.println("Valeur saisie incorrect merci de réssayer");
+            System.out.println("Valeur saisie incorrect, merci de réssayer !");
             System.out.println();
             return;
         }
@@ -93,7 +94,8 @@ public class MainCLI extends AbstractCLI {
         System.out.print("Nom de la classe B : ");
         String classNameB = inputReader.readLine();
 
+        float couplingWeight = analyzer.calculateCouplingMetric(classNameA, classNameB);
 
-        System.out.printf("Le couplage entre %s et %s vaut %d. %n", classNameA, classNameB, analyzer.calculateCouplingMetric(classNameA, classNameB));
+        System.out.printf("Le couplage entre %s et %s vaut %f (%.2f%%). %n", classNameA, classNameB, couplingWeight, couplingWeight*100);
     }
 }
