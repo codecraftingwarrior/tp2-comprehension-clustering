@@ -31,8 +31,8 @@ public class Analyzer {
 
     private final Map<String, Integer> LOCountByMethod = new LinkedHashMap<>();
 
-    private final SingleGraph callGraph = new SingleGraph("Call graph");
-
+    private final SingleGraph callGraph = new SingleGraph("Call Graph");
+    private final SingleGraph couplingGraph = new SingleGraph("Coupling Graph");
 
     List<File> javaFiles = new ArrayList<>();
 
@@ -460,7 +460,30 @@ public class Analyzer {
         return couplingCounter / totalCoupling;
     }
 
-    public void buildWeightedCouplingGraph() {
+    public void buildWeightedCouplingGraph() throws IOException{
+
+        for (File fileEntry : javaFiles) {
+            //Création de l'AST
+            String content = FileUtils.readFileToString(fileEntry, StandardCharsets.UTF_8);
+            CompilationUnit ast = parse(content.toCharArray());
+
+            //Visite des classes
+            TypeDeclarationVisitor visitor = new TypeDeclarationVisitor();
+            ast.accept(visitor);
+
+            //Création de tous les noeuds
+            this.couplingGraph.addNode(visitor.getClasses().get(0).getName().toString());
+        }
+
+        int totalNode = this.couplingGraph.getNodeCount();
+
+        //Création des arrêtes pondérées
+        for (Node node1 : this.callGraph.nodes().collect(Collectors.toList())){
+            for (Node node2 : this.callGraph.nodes().collect(Collectors.toList())){
+
+                this.callGraph.addEdge("concatenation", node1, node2);
+            }
+        }
 
     }
 
