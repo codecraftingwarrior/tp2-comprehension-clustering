@@ -480,7 +480,6 @@ public class Analyzer {
         //Création des arrêtes pondérées
         for (Node node1 : this.callGraph.nodes().collect(Collectors.toList())){
             for (Node node2 : this.callGraph.nodes().collect(Collectors.toList())){
-
                 this.callGraph.addEdge("concatenation", node1, node2);
             }
         }
