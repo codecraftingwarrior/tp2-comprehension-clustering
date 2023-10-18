@@ -81,6 +81,10 @@ public class MainCLI extends AbstractCLI {
                 break;
 
             case "2":
+                analyzer.buildWeightedCouplingGraph();
+                break;
+
+            case "3":
                 analyzer.buildAndShowCallGraph();
                 break;
         }

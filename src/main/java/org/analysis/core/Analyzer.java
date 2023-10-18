@@ -16,11 +16,12 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class Analyzer {
     private static String projectPath;
-
     private static String projectSourcePath;
     private static final String jrePath = "/System/Library/Frameworks/JavaVM.framework/";
     private Integer classCount = null, methodCount = null;
@@ -32,9 +33,11 @@ public class Analyzer {
     private final Map<String, Integer> LOCountByMethod = new LinkedHashMap<>();
 
     private final SingleGraph callGraph = new SingleGraph("Call Graph");
-    private final SingleGraph couplingGraph = new SingleGraph("Coupling Graph");
+    private final SingleGraph weightedCouplingGraph = new SingleGraph("Coupling Graph");
 
     List<File> javaFiles = new ArrayList<>();
+
+    List<String> javaFileNames = new ArrayList<>();
 
     private static Analyzer instance = null;
 
@@ -43,6 +46,10 @@ public class Analyzer {
         projectSourcePath = projectPath + "/src";
         final File folder = new File(projectSourcePath);
         javaFiles = listJavaFilesForFolder(folder);
+        javaFileNames = javaFiles
+                .stream()
+                .map(File::getName)
+                .collect(Collectors.toList());
     }
 
     public static Analyzer getInstance(String projectPath) {
@@ -387,12 +394,15 @@ public class Analyzer {
                 if (!miVisitor.getMethodInvocations().isEmpty()) {
                     for (MethodInvocation mi : miVisitor.getMethodInvocations()) {
                         String invokedMethodName = getFullMethodName(mi);
-                        if (callGraph.nodes().noneMatch(n -> n.getId().equals(invokedMethodName)))
+                        Pattern regex = Pattern.compile("^(\\w+)\\.(\\w+)$");
+                        Matcher matcher = regex.matcher(invokedMethodName);
+                        if (callGraph.nodes().noneMatch(n -> n.getId().equals(invokedMethodName)) && matcher.matches() && javaFileNames.contains(matcher.group(1) + ".java")) {
                             this.callGraph.addNode(invokedMethodName);
 
-                        String edgeID = fullMethodName + "-" + invokedMethodName;
-                        if (callGraph.edges().noneMatch(e -> e.getId().equals(edgeID)))
-                            this.callGraph.addEdge(edgeID, fullMethodName, invokedMethodName, true);
+                            String edgeID = fullMethodName + "-" + invokedMethodName;
+                            if (callGraph.edges().noneMatch(e -> e.getId().equals(edgeID)))
+                                this.callGraph.addEdge(edgeID, fullMethodName, invokedMethodName, true);
+                        }
                     }
                 }
 
@@ -447,43 +457,75 @@ public class Analyzer {
     }
 
     public float calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
-        float couplingCounter = 0;
+        int couplingCounter = 0;
 
-        buildCallGraph();
+        if (!this.callGraph.nodes().findAny().isPresent())
+            buildCallGraph();
 
         float totalCoupling = callGraph.edges().count();
 
-        for(Edge e: callGraph.edges().collect(Collectors.toList()))
-            if(e.getNode0().getId().startsWith(classNameA + ".") && e.getNode1().getId().startsWith(classNameB + "."))
+        for (Edge e : callGraph.edges().collect(Collectors.toList()))
+            if (
+                    (e.getNode0().getId().startsWith(classNameA + ".")
+                            && e.getNode1().getId().startsWith(classNameB + "."))
+                            ||
+                            (e.getNode0().getId().startsWith(classNameB + ".")
+                                    && e.getNode1().getId().startsWith(classNameA + ".")))
                 couplingCounter++;
 
         return couplingCounter / totalCoupling;
     }
 
-    public void buildWeightedCouplingGraph() throws IOException{
+    public void buildWeightedCouplingGraph() throws IOException {
+        for (String javaFileName : javaFileNames) {
+            String outerClassName = javaFileName.substring(0, javaFileName.lastIndexOf("."));
+            if (weightedCouplingGraph.nodes().noneMatch(n -> n.getId().equals(outerClassName)))
+                weightedCouplingGraph.addNode(outerClassName);
 
-        for (File fileEntry : javaFiles) {
-            //Création de l'AST
-            String content = FileUtils.readFileToString(fileEntry, StandardCharsets.UTF_8);
-            CompilationUnit ast = parse(content.toCharArray());
+            for (String innerJavaFileName : javaFileNames) {
+                if (!javaFileName.equals(innerJavaFileName)) {
+                    String innerClassName = innerJavaFileName.substring(0, innerJavaFileName.lastIndexOf("."));
+                    float couplingMetric = calculateCouplingMetric(outerClassName, innerClassName);
+                    if (couplingMetric > 0) {
+                        if (weightedCouplingGraph.nodes().noneMatch(n -> n.getId().equals(innerClassName)))
+                            weightedCouplingGraph.addNode(innerClassName);
+                        if (weightedCouplingGraph.edges().noneMatch(n -> n.getId().equals(outerClassName + "->" + innerClassName)) && weightedCouplingGraph.edges().noneMatch(n -> n.getId().equals(innerClassName + "->" + outerClassName))) {
+                            Edge e = weightedCouplingGraph.addEdge(outerClassName + "->" + innerClassName, outerClassName, innerClassName);
+                            e.setAttribute("ui.label", String.format("%.3f", couplingMetric));
+                        }
 
-            //Visite des classes
-            TypeDeclarationVisitor visitor = new TypeDeclarationVisitor();
-            ast.accept(visitor);
+                    }
 
-            //Création de tous les noeuds
-            this.couplingGraph.addNode(visitor.getClasses().get(0).getName().toString());
-        }
-
-        int totalNode = this.couplingGraph.getNodeCount();
-
-        //Création des arrêtes pondérées
-        for (Node node1 : this.callGraph.nodes().collect(Collectors.toList())){
-            for (Node node2 : this.callGraph.nodes().collect(Collectors.toList())){
-                this.callGraph.addEdge("concatenation", node1, node2);
+                }
             }
         }
 
+
+        String css = "text-alignment: at-right; text-padding: 3px, 2px; text-background-mode: rounded-box; text-background-color: #EB2; text-color: #222;";
+
+        for (
+                Node node : this.weightedCouplingGraph.nodes().
+
+                collect(Collectors.toList())) {
+            //node.setAttribute("ui.style", "shape:circle; fill-color: cyan;size: 30px; text-alignment: center;");
+            node.setAttribute("ui.style", css);
+            node.setAttribute("ui.label", node.getId());
+            if (!node.neighborNodes().findAny().isPresent())
+                node.setAttribute("ui.hide");
+
+        }
+
+        for (
+                Edge edge : this.weightedCouplingGraph.edges().
+
+                collect(Collectors.toList())) {
+            edge.setAttribute("layout.weight", 20.0);
+        }
+
+        weightedCouplingGraph.setAttribute("ui.quality");
+        weightedCouplingGraph.setAttribute("ui.style", "padding: 10px;");
+
+        weightedCouplingGraph.display();
     }
 
 }
