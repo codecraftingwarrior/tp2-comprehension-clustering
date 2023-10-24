@@ -56,6 +56,7 @@ public class MainCLI extends AbstractCLI {
         stringBuilder.append("\n1. Couplage entre deux classe A et B.");
         stringBuilder.append("\n2. Générer le graphe de couplage pondéré.");
         stringBuilder.append("\n3. Visualiser le graphe d'appel.");
+        stringBuilder.append("\n4. Clustering - Identification des modules.");
         stringBuilder.append("\n---------------------------------");
 
         System.out.println(stringBuilder);
@@ -86,6 +87,10 @@ public class MainCLI extends AbstractCLI {
 
             case "3":
                 analyzer.buildAndShowCallGraph();
+                break;
+
+            case "4":
+                analyzer.buildClusters();
                 break;
         }
 
