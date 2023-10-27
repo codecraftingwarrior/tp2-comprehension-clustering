@@ -13,16 +13,29 @@ public class Cluster {
         this.classes.add(className);
     }
 
+    public Cluster() {
+        this.classes = new LinkedHashSet<>();
+    }
+
+    public Cluster(Cluster cluster1, Cluster cluster2) {
+        this.classes = new LinkedHashSet<>();
+        this.classes.addAll(cluster1.getClasses());
+        this.classes.addAll(cluster2.getClasses());
+    }
+
     public Cluster(Cluster c) {
         this.merge(c);
     }
 
-    public Cluster merge(Cluster other) {
+    public void merge(Cluster other) {
         this.classes.addAll(other.getClasses());
-        return this;
     }
 
     public Set<String> getClasses() {
         return classes;
+    }
+
+    public static Cluster empty() {
+        return new Cluster();
     }
 }

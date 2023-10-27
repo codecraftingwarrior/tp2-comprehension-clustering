@@ -23,7 +23,8 @@ import java.util.stream.Collectors;
 public class Analyzer {
     private static String projectPath;
     private static String projectSourcePath;
-    private static final String jrePath = "/usr/lib/jvm/java-11-openjdk-amd64";
+   // private static final String jrePath = "/usr/lib/jvm/java-11-openjdk-amd64";
+    private static final String jrePath = "/System/Library/Frameworks/JavaVM.framework/";
     private Integer classCount = null, methodCount = null;
 
     private final Map<String, Integer> methodCountByClass = new LinkedHashMap<>();
@@ -307,8 +308,9 @@ public class Analyzer {
                 .buildClusters()
                 .getDendro();
 
+        int i = 0;
         for (Cluster cluster : clusters) {
-            System.out.print("Cluster [ ");
+            System.out.print("Cluster " + (++i) + " [ ");
             cluster.getClasses().forEach(c -> System.out.print(c + " "));
             System.out.println("]");
         }

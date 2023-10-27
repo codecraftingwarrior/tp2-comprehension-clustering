@@ -2,6 +2,7 @@ package org.analysis.clustering;
 
 import org.analysis.cli.processor.DoubleInputProcessor;
 import org.analysis.core.Analyzer;
+import org.eclipse.osgi.container.Module;
 import org.graphstream.graph.Element;
 
 import java.io.IOException;
@@ -18,7 +19,6 @@ public class ModuleClusterer {
 
     private Set<Cluster> dendro;
 
-
     public ModuleClusterer(Analyzer analyzer) {
         this.analyzer = analyzer;
 
@@ -34,6 +34,7 @@ public class ModuleClusterer {
             Cluster cluster = new Cluster(classe);
             clusters.add(cluster);
         }
+
     }
 
     public ModuleClusterer buildClusters() throws IOException {
@@ -49,8 +50,8 @@ public class ModuleClusterer {
 
         while (clusters.size() > 1) {
             double bestMetric = -1.0;
-            Cluster cluster1 = null;
-            Cluster cluster2 = null;
+            Cluster cluster1 = Cluster.empty();
+            Cluster cluster2 = Cluster.empty();
 
             for (int i = 0; i < clusters.size(); i++) {
                 for (int j = i + 1; j < clusters.size(); j++) {
@@ -67,14 +68,16 @@ public class ModuleClusterer {
                 }
             }
 
-            cluster1.merge(cluster2);
+            //cluster1.merge(cluster2);
+            clusters.remove(cluster1);
             clusters.remove(cluster2);
-            dendro.add(cluster1);
-
+            
+            Cluster result = new Cluster(cluster1, cluster2);
+            clusters.add(result);
+            dendro.add(result);
         }
 
         return this;
-
     }
 
     public List<Cluster> getClusters() {
