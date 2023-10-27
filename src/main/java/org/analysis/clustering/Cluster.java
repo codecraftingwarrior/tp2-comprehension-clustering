@@ -1,9 +1,9 @@
 package org.analysis.clustering;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import org.analysis.core.Analyzer;
+
+import java.io.IOException;
+import java.util.*;
 
 public class Cluster {
     private Set<String> classes;
@@ -37,5 +37,17 @@ public class Cluster {
 
     public static Cluster empty() {
         return new Cluster();
+    }
+
+    public double getAVGCoupling() throws IOException {
+        Analyzer analyzer = Analyzer.getInstance();
+
+        double coupling = 0.0;
+        Object[] allClasses = classes.toArray();
+        for (int i = 0; i < classes.size(); i++)
+            for (int j = i + 1; j < classes.size(); j++)
+                coupling += analyzer.calculateCouplingMetric((String)allClasses[i], (String)allClasses[j]);
+
+        return coupling;
     }
 }

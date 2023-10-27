@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 public class Analyzer {
     private static String projectPath;
     private static String projectSourcePath;
-   // private static final String jrePath = "/usr/lib/jvm/java-11-openjdk-amd64";
+    // private static final String jrePath = "/usr/lib/jvm/java-11-openjdk-amd64";
     private static final String jrePath = "/System/Library/Frameworks/JavaVM.framework/";
     private Integer classCount = null, methodCount = null;
 
@@ -42,6 +42,9 @@ public class Analyzer {
 
     private static Analyzer instance = null;
 
+    private static ModuleClusterer clusterer;
+
+
     private Analyzer(String projectUrl) {
         projectPath = projectUrl.isEmpty() ? getDefaultProjectDirPath() : projectUrl;
         projectSourcePath = projectPath + "/src";
@@ -56,6 +59,14 @@ public class Analyzer {
     public static Analyzer getInstance(String projectPath) {
         if (instance == null)
             instance = new Analyzer(projectPath);
+
+        clusterer = new ModuleClusterer(instance);
+        return instance;
+    }
+
+    public static Analyzer getInstance() {
+        if (instance == null)
+            throw new RuntimeException("Aucun singleton existant");
 
         return instance;
     }
@@ -219,7 +230,7 @@ public class Analyzer {
         }
     }
 
-    public float calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
+    public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
         int couplingCounter = 0;
 
         if (!this.callGraph.nodes().findAny().isPresent())
@@ -258,7 +269,7 @@ public class Analyzer {
             for (String innerJavaFileName : javaFileNames) {
                 if (!javaFileName.equals(innerJavaFileName)) {
                     String innerClassName = innerJavaFileName.substring(0, innerJavaFileName.lastIndexOf("."));
-                    float couplingMetric = calculateCouplingMetric(outerClassName, innerClassName);
+                    double couplingMetric = calculateCouplingMetric(outerClassName, innerClassName);
                     if (couplingMetric > 0) {
                         if (weightedCouplingGraph.nodes().noneMatch(n -> n.getId().equals(innerClassName)))
                             weightedCouplingGraph.addNode(innerClassName);
@@ -302,18 +313,34 @@ public class Analyzer {
     }
 
     public void buildClusters() throws IOException {
-        ModuleClusterer clusterer = new ModuleClusterer(instance);
+        Set<Cluster> clusters;
+        if (clusterer.getDendro() == null || clusterer.getDendro().isEmpty())
+            clusters = clusterer
+                    .buildClusters()
+                    .getDendro();
+        else
+            clusters = clusterer.getDendro();
 
-        Set<Cluster> clusters = clusterer
-                .buildClusters()
-                .getDendro();
 
         int i = 0;
         for (Cluster cluster : clusters) {
-            System.out.print("Cluster " + (++i) + " [ ");
+            System.out.print("Cluster " + (++i) + " { " + (cluster.getAVGCoupling()) + " } [ ");
             cluster.getClasses().forEach(c -> System.out.print(c + " "));
             System.out.println("]");
         }
+    }
+
+    public void identifyModules() throws IOException {
+        Set<Cluster> modules = clusterer.getIdentifiedModules();
+
+        int i = 0;
+        for (Cluster module : modules) {
+            System.out.print("Module " + (++i) + " { " + (module.getAVGCoupling()) + " } [ ");
+            module.getClasses().forEach(c -> System.out.print(c + " "));
+            System.out.println("]");
+        }
+
+
     }
 
 }

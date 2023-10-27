@@ -38,10 +38,6 @@ public class ModuleClusterer {
     }
 
     public ModuleClusterer buildClusters() throws IOException {
-        // get the minimum coupling average value (CP)
-        DoubleInputProcessor processor = new DoubleInputProcessor("Valeur de CP : ");
-        double minimumCouplingValue = processor.process();
-
         System.out.println("Démmarage du processus de Clustering ...........");
         System.out.println("Clustering en cours ...........");
 
@@ -49,7 +45,7 @@ public class ModuleClusterer {
 
 
         while (clusters.size() > 1) {
-            double bestMetric = Double.MAX_VALUE;
+            double bestMetric = -1.0;
             Cluster cluster1 = Cluster.empty();
             Cluster cluster2 = Cluster.empty();
 
@@ -60,7 +56,7 @@ public class ModuleClusterer {
 
                     double metric = analyzer.calculateCouplingMetric(c1, c2);
 
-                    if (metric < bestMetric) {
+                    if (metric > bestMetric) {
                         bestMetric = metric;
                         cluster1 = c1;
                         cluster2 = c2;
@@ -71,13 +67,43 @@ public class ModuleClusterer {
             //cluster1.merge(cluster2);
             clusters.remove(cluster1);
             clusters.remove(cluster2);
-            
+
             Cluster result = new Cluster(cluster1, cluster2);
             clusters.add(result);
             dendro.add(result);
         }
 
         return this;
+    }
+
+    public Set<Cluster> getIdentifiedModules() throws IOException {
+        // get the minimum coupling average value (CP)
+        DoubleInputProcessor processor = new DoubleInputProcessor("Saisir la valeur de CP >> ");
+        double minimumCouplingValue = processor.process();
+        Set<Cluster> result = new LinkedHashSet<>();
+
+        int createdModules = 0;
+
+        if (dendro == null || dendro.isEmpty())
+            this.buildClusters();
+
+
+        System.out.println("Démmarage du processus de detection des modules ..........");
+        System.out.println("Détection des modules en cours ........ ");
+
+        List<Cluster> clonedDendro = new ArrayList<>(this.dendro);
+        int i = 0;
+        while (createdModules < (this.candidates.size() / 2) && i < clonedDendro.size()) {
+            Cluster potentialModule = clonedDendro.get(i);
+            if (potentialModule.getAVGCoupling() > minimumCouplingValue) {
+                result.add(potentialModule);
+                createdModules++;
+            }
+            i++;
+        }
+
+
+        return result;
     }
 
     public List<Cluster> getClusters() {

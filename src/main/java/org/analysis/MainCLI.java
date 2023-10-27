@@ -56,7 +56,8 @@ public class MainCLI extends AbstractCLI {
         stringBuilder.append("\n1. Couplage entre deux classe A et B.");
         stringBuilder.append("\n2. Générer le graphe de couplage pondéré.");
         stringBuilder.append("\n3. Visualiser le graphe d'appel.");
-        stringBuilder.append("\n4. Clustering - Identification des modules.");
+        stringBuilder.append("\n4. Clustering - Identification des clusters.");
+        stringBuilder.append("\n5. Identification des groupes de classes couplées (Modules / Service /...).");
         stringBuilder.append("\n---------------------------------");
 
         System.out.println(stringBuilder);
@@ -92,6 +93,9 @@ public class MainCLI extends AbstractCLI {
             case "4":
                 analyzer.buildClusters();
                 break;
+            case "5":
+                analyzer.identifyModules();
+                break;
         }
 
     }
@@ -103,7 +107,7 @@ public class MainCLI extends AbstractCLI {
         System.out.print("Nom de la classe B : ");
         String classNameB = inputReader.readLine();
 
-        float couplingWeight = analyzer.calculateCouplingMetric(classNameA, classNameB);
+        double couplingWeight = analyzer.calculateCouplingMetric(classNameA, classNameB);
 
         System.out.printf("Le couplage entre %s et %s vaut %f (%.2f%%). %n", classNameA, classNameB, couplingWeight, couplingWeight*100);
     }
