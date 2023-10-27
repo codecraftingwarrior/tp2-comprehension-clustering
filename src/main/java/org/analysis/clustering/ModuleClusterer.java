@@ -49,7 +49,7 @@ public class ModuleClusterer {
 
 
         while (clusters.size() > 1) {
-            double bestMetric = -1.0;
+            double bestMetric = Double.MAX_VALUE;
             Cluster cluster1 = Cluster.empty();
             Cluster cluster2 = Cluster.empty();
 
@@ -60,7 +60,7 @@ public class ModuleClusterer {
 
                     double metric = analyzer.calculateCouplingMetric(c1, c2);
 
-                    if (metric > bestMetric) {
+                    if (metric < bestMetric) {
                         bestMetric = metric;
                         cluster1 = c1;
                         cluster2 = c2;
