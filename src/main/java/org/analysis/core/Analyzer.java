@@ -2,38 +2,27 @@ package org.analysis.core;
 
 import org.analysis.clustering.Cluster;
 import org.analysis.clustering.ModuleClusterer;
-import org.analysis.visitor.*;
-import org.apache.commons.io.FileUtils;
-import org.eclipse.jdt.core.JavaCore;
-import org.eclipse.jdt.core.dom.*;
 import org.graphstream.graph.Edge;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
-import org.graphstream.ui.layout.springbox.implementations.LinLog;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import spoon.Launcher;
+import spoon.reflect.CtModel;
+import spoon.reflect.declaration.CtClass;
+import spoon.reflect.visitor.filter.TypeFilter;
+import spoon.reflect.code.CtInvocation;
+
 public class Analyzer {
-    private static String projectPath;
-    private static String projectSourcePath;
+
     // private static final String jrePath = "/usr/lib/jvm/java-11-openjdk-amd64";
     private static final String jrePath = "/System/Library/Frameworks/JavaVM.framework/";
     private Integer classCount = null, methodCount = null;
 
-    private final Map<String, Integer> methodCountByClass = new LinkedHashMap<>();
-
-    private final Map<String, Integer> attributeCountByClass = new LinkedHashMap<>();
-
-    private final Map<String, Integer> LOCountByMethod = new LinkedHashMap<>();
-
-    private final SingleGraph callGraph = new SingleGraph("Call Graph");
     private final SingleGraph weightedCouplingGraph = new SingleGraph("Coupling Graph");
 
     private List<File> javaFiles = new ArrayList<>();
@@ -43,166 +32,51 @@ public class Analyzer {
     private static Analyzer instance = null;
 
     private static ModuleClusterer clusterer;
+    private CtModel model;
 
 
     private Analyzer(String projectUrl) {
-        projectPath = projectUrl.isEmpty() ? getDefaultProjectDirPath() : projectUrl;
-        projectSourcePath = projectPath + "/src";
-        final File folder = new File(projectSourcePath);
-        javaFiles = listJavaFilesForFolder(folder);
-        javaFileNames = javaFiles
-                .stream()
-                .map(File::getName)
-                .collect(Collectors.toList());
+        Launcher launcher = new Launcher();
+        launcher.addInputResource(projectUrl);
+        launcher.buildModel();
+        model = launcher.getModel();
     }
 
-    public static Analyzer getInstance(String projectPath) {
-        if (instance == null)
-            instance = new Analyzer(projectPath);
+    public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
+        CtClass<?> classA = (CtClass<?>) model.getAllTypes().stream()
+                .filter(type -> type instanceof CtClass<?> && type.getSimpleName().equals(classNameA))
+                .findFirst()
+                .orElse(null);
 
-        clusterer = new ModuleClusterer(instance);
-        return instance;
-    }
+        CtClass<?> classB = (CtClass<?>) model.getAllTypes().stream()
+                .filter(type -> type instanceof CtClass<?> && type.getSimpleName().equals(classNameB))
+                .findFirst()
+                .orElse(null);
 
-    public static Analyzer getInstance() {
-        if (instance == null)
-            throw new RuntimeException("Aucun singleton existant");
-
-        return instance;
-    }
-
-    public SingleGraph getCallGraph() {
-        return callGraph;
-    }
-
-    public List<String> getJavaFileNames() {
-        return javaFileNames;
-    }
-
-    public List<File> getJavaFiles() {
-        return javaFiles;
-    }
-
-    private @NotNull ArrayList<File> listJavaFilesForFolder(final @NotNull File folder) {
-        ArrayList<File> javaFiles = new ArrayList<>();
-
-        for (File fileEntry : Objects.requireNonNull(folder.listFiles())) {
-            if (fileEntry.isDirectory()) {
-                javaFiles.addAll(listJavaFilesForFolder(fileEntry));
-            } else if (fileEntry.getName().contains(".java")) {
-                javaFiles.add(fileEntry);
-            }
-        }
-        return javaFiles;
-    }
-
-    // Création de l'AST
-    private CompilationUnit parse(char[] classSource) {
-        ASTParser parser = ASTParser.newParser(AST.JLS4); // java +1.6
-        parser.setResolveBindings(true);
-        parser.setKind(ASTParser.K_COMPILATION_UNIT);
-
-        parser.setBindingsRecovery(true);
-
-        Map options = JavaCore.getOptions();
-        parser.setCompilerOptions(options);
-
-        parser.setUnitName("");
-
-        String[] sources = {projectSourcePath};
-        String[] classpath = {jrePath};
-
-        parser.setEnvironment(classpath, sources, new String[]{"UTF-8"}, true);
-        parser.setSource(classSource);
-
-        return (CompilationUnit) parser.createAST(null); // create and parse
-    }
-
-
-    public void buildAndShowCallGraph() throws IOException {
-
-        buildCallGraph();
-
-        String css = "text-alignment: at-right; text-padding: 3px, 2px; text-background-mode: rounded-box; text-background-color: #EB2; text-color: #222;";
-
-        for (Node node : this.callGraph.nodes().collect(Collectors.toList())) {
-            //node.setAttribute("ui.style", "shape:circle; fill-color: cyan;size: 30px; text-alignment: center;");
-            node.setAttribute("ui.style", css);
-            node.setAttribute("ui.label", node.getId());
-            if (!node.neighborNodes().findAny().isPresent())
-                node.setAttribute("ui.hide");
-
+        if (classA == null || classB == null) {
+            throw new IllegalArgumentException("One of the classes cannot be found in the model.");
         }
 
-        for (Edge edge : this.callGraph.edges().collect(Collectors.toList())) {
-            edge.setAttribute("layout.weight", 20.0);
-        }
+        long totalRelations = model.getAllTypes().stream()
+                .flatMap(type -> type.getMethods().stream())
+                .flatMap(method -> method.getElements(new TypeFilter<>(CtInvocation.class)).stream())
+                .count();
 
-        callGraph.setAttribute("ui.quality");
-        callGraph.setAttribute("ui.style", "padding: 40px;");
+        long relationsAB = classA.getMethods().stream()
+                .flatMap(method -> method.getElements(new TypeFilter<>(CtInvocation.class)).stream())
+                .map(CtInvocation::getExecutable)
+                .filter(executable -> executable.getDeclaringType() != null)
+                .filter(executable -> executable.getDeclaringType().getSimpleName().equals(classNameB))
+                .count();
 
-        LinLog layout = new LinLog();
-        layout.setStabilizationLimit(0.001); // Valeur de stabilisation
-        layout.setQuality(1.0); // Qualité de la disposition
-        callGraph.display().enableAutoLayout(layout);
+        long relationsBA = classB.getMethods().stream()
+                .flatMap(method -> method.getElements(new TypeFilter<>(CtInvocation.class)).stream())
+                .map(CtInvocation::getExecutable)
+                .filter(executable -> executable.getDeclaringType() != null)
+                .filter(executable -> executable.getDeclaringType().getSimpleName().equals(classNameA))
+                .count();
 
-    }
-
-    public void buildCallGraph() throws IOException {
-        for (File fileEntry : javaFiles) {
-            String content = FileUtils.readFileToString(fileEntry, StandardCharsets.UTF_8);
-            CompilationUnit ast = parse(content.toCharArray());
-
-            MethodDeclarationVisitor visitor = new MethodDeclarationVisitor();
-            ast.accept(visitor);
-
-            for (MethodDeclaration method : visitor.getMethodDeclarations()) {
-
-                String fullMethodName = getFullMethodName(method);
-                if (callGraph.nodes().noneMatch(n -> n.getId().equals(fullMethodName)))
-                    this.callGraph.addNode(fullMethodName);
-
-                MethodInvocationVisitor miVisitor = new MethodInvocationVisitor();
-                method.accept(miVisitor);
-
-                if (!miVisitor.getMethodInvocations().isEmpty()) {
-                    for (MethodInvocation mi : miVisitor.getMethodInvocations()) {
-                        String invokedMethodName = getFullMethodName(mi);
-                        Pattern regex = Pattern.compile("^(\\w+)\\.(\\w+)$");
-                        Matcher matcher = regex.matcher(invokedMethodName);
-                        if (callGraph.nodes().noneMatch(n -> n.getId().equals(invokedMethodName)) && matcher.matches() && javaFileNames.contains(matcher.group(1) + ".java")) {
-                            this.callGraph.addNode(invokedMethodName);
-
-                            String edgeID = fullMethodName + "-" + invokedMethodName;
-                            if (callGraph.edges().noneMatch(e -> e.getId().equals(edgeID)))
-                                this.callGraph.addEdge(edgeID, fullMethodName, invokedMethodName, true);
-                        }
-                    }
-                }
-
-            }
-
-        }
-    }
-
-    private String getFullMethodName(MethodInvocation mi) {
-        if (mi.getExpression() != null)
-            if (mi.getExpression().resolveTypeBinding() != null)
-                return mi.getExpression().resolveTypeBinding().getName() + "." + mi.getName().toString();
-
-        if (mi.resolveMethodBinding() != null)
-            return mi.resolveMethodBinding().getDeclaringClass().getName() + "." + mi.getName().toString();
-
-        if (mi.resolveTypeBinding() != null)
-            return mi.resolveTypeBinding().getDeclaringClass().getName() + "." + mi.getName().toString();
-
-        return mi.getName().toString();
-    }
-
-    private String getFullMethodName(MethodDeclaration method) {
-        String className = method.resolveBinding().getDeclaringClass().getName();
-
-        return className + "." + method.getName().toString();
+        return (double) (relationsAB + relationsBA) / totalRelations;
     }
 
     public static String getDefaultProjectDirPath() {
@@ -230,25 +104,7 @@ public class Analyzer {
         }
     }
 
-    public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
-        int couplingCounter = 0;
 
-        if (!this.callGraph.nodes().findAny().isPresent())
-            buildCallGraph();
-
-        float totalCoupling = callGraph.edges().count();
-
-        for (Edge e : callGraph.edges().collect(Collectors.toList()))
-            if (
-                    (e.getNode0().getId().startsWith(classNameA + ".")
-                            && e.getNode1().getId().startsWith(classNameB + "."))
-                            ||
-                            (e.getNode0().getId().startsWith(classNameB + ".")
-                                    && e.getNode1().getId().startsWith(classNameA + ".")))
-                couplingCounter++;
-
-        return couplingCounter / totalCoupling;
-    }
 
     public float calculateCouplingMetric(Cluster cluster1, Cluster cluster2) throws IOException {
         float result = 0.0f;
