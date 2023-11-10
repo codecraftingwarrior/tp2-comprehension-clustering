@@ -1,14 +1,13 @@
 package org.analysis.core;
-import org.analysis.clustering.Cluster;
-import org.analysis.clustering.ModuleClusterer;
-import org.graphstream.graph.Edge;
+
 import org.graphstream.graph.Node;
+import org.graphstream.graph.Edge;
 import org.graphstream.graph.implementations.SingleGraph;
+import org.graphstream.ui.layout.springbox.implementations.LinLog;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import spoon.Launcher;
 import spoon.reflect.CtModel;
@@ -22,8 +21,6 @@ public class Analyzer {
 
     private final SingleGraph callGraph = new SingleGraph("Call Graph");
     private final SingleGraph weightedCouplingGraph = new SingleGraph("Coupling Graph");
-    private static Analyzer instance = null;
-    private static ModuleClusterer clusterer;
     private CtModel model; // Modèle Spoon pour l'AST
 
     // Constructeur de l'analyseur qui initialise Spoon et construit le modèle AST
@@ -72,53 +69,31 @@ public class Analyzer {
         return (double) (relationsAB + relationsBA) / totalRelations;
     }
 
-    public void buildCallGraph() {
-        // Utilisez le modèle pour trouver toutes les méthodes et leurs invocations
-        for (CtMethod<?> method : this.model.getElements(new TypeFilter<>(CtMethod.class))) {
-            String fullMethodName = getFullMethodName(method);
+    // Méthode pour construire et afficher le graphe d'appel basé sur les informations fournies par Spoon
+    public void buildAndShowCallGraph() {
 
-            // Ajoutez le nœud pour la méthode courante s'il n'existe pas déjà
-            if (callGraph.getNode(fullMethodName) == null) {
-                callGraph.addNode(fullMethodName);
-            }
+        // Construis le graphe d'appel en utilisant Spoon
+        for (CtMethod<?> method : model.getElements(new TypeFilter<>(CtMethod.class))) {
+            String methodName = method.getSignature();
+            Node methodNode = callGraph.addNode(methodName);
+            methodNode.setAttribute("ui.label", methodName);
 
-            // Pour chaque invocation dans la méthode
             for (CtInvocation<?> invocation : method.getElements(new TypeFilter<>(CtInvocation.class))) {
                 CtExecutableReference<?> executable = invocation.getExecutable();
                 if (executable.getDeclaringType() != null) {
-                    String invokedMethodName = getFullMethodName(executable);
-
-                    // Ajoutez le nœud pour la méthode invoquée s'il n'existe pas déjà
-                    if (callGraph.getNode(invokedMethodName) == null) {
-                        callGraph.addNode(invokedMethodName);
-                    }
-
-                    // Ajoutez l'arête entre la méthode courante et la méthode invoquée
-                    String edgeID = fullMethodName + "-" + invokedMethodName;
-                    if (callGraph.getEdge(edgeID) == null) {
-                        callGraph.addEdge(edgeID, fullMethodName, invokedMethodName);
-                    }
+                    String invokedMethodName = executable.getDeclaringType().getSimpleName() + "." + executable.getSimpleName();
+                    Node invokedNode = callGraph.addNode(invokedMethodName);
+                    invokedNode.setAttribute("ui.label", invokedMethodName);
+                    callGraph.addEdge(methodName + "->" + invokedMethodName, methodNode, invokedNode, true);
                 }
             }
         }
-    }
 
-    private String getFullMethodName(CtMethod<?> method) {
-        // Obtenez le nom de la classe déclarante
-        String className = method.getDeclaringType().getSimpleName();
-        // Obtenez le nom de la méthode
-        String methodName = method.getSimpleName();
-        // Concaténez-les pour obtenir un nom complet au format "NomClasse.nomMethod"
-        return className + "." + methodName;
-    }
+        // Applique les styles CSS aux nœuds et aux arêtes
+        setGraphStyle();
 
-    private String getFullMethodName(CtExecutableReference<?> executable) {
-        // Obtenez le nom de la classe déclarante
-        String className = executable.getDeclaringType().getSimpleName();
-        // Obtenez le nom de la méthode
-        String methodName = executable.getSimpleName();
-        // Concaténez-les pour obtenir un nom complet au format "NomClasse.nomMethod"
-        return className + "." + methodName;
+        // Affiche le graphe avec un layout automatique
+        callGraph.display().enableAutoLayout(new LinLog());
     }
 
     public static String getDefaultProjectDirPath() {
@@ -146,97 +121,62 @@ public class Analyzer {
         }
     }
 
-    public float calculateCouplingMetric(Cluster cluster1, Cluster cluster2) throws IOException {
-        float result = 0.0f;
-
-        for (String classNameA : cluster1.getClasses())
-            for (String classNameB : cluster2.getClasses())
-                result += calculateCouplingMetric(classNameA, classNameB);
-
-        return result;
-    }
-
     public void buildWeightedCouplingGraph() throws IOException {
-        for (String javaFileName : javaFileNames) {
-            String outerClassName = javaFileName.substring(0, javaFileName.lastIndexOf("."));
-            if (weightedCouplingGraph.nodes().noneMatch(n -> n.getId().equals(outerClassName)))
-                weightedCouplingGraph.addNode(outerClassName);
+        // Parcours toutes les classes du modèle Spoon
+        List<CtClass<?>> allClasses = model.getElements(new TypeFilter<>(CtClass.class));
 
-            for (String innerJavaFileName : javaFileNames) {
-                if (!javaFileName.equals(innerJavaFileName)) {
-                    String innerClassName = innerJavaFileName.substring(0, innerJavaFileName.lastIndexOf("."));
-                    double couplingMetric = calculateCouplingMetric(outerClassName, innerClassName);
+        // Ajoute tous les nœuds au graphe, un pour chaque classe
+        allClasses.forEach(ctClass -> {
+            String className = ctClass.getSimpleName();
+            if (weightedCouplingGraph.getNode(className) == null) {
+                weightedCouplingGraph.addNode(className);
+            }
+        });
+
+        // Calcule la métrique de couplage pour chaque paire de classes
+        for (CtClass<?> classA : allClasses) {
+            for (CtClass<?> classB : allClasses) {
+                if (!classA.equals(classB)) {
+                    String classNameA = classA.getSimpleName();
+                    String classNameB = classB.getSimpleName();
+
+                    // Utilise la méthode existante pour calculer la métrique de couplage entre deux classes
+                    float couplingMetric = (float) calculateCouplingMetric(classNameA, classNameB);
+
                     if (couplingMetric > 0) {
-                        if (weightedCouplingGraph.nodes().noneMatch(n -> n.getId().equals(innerClassName)))
-                            weightedCouplingGraph.addNode(innerClassName);
-                        if (weightedCouplingGraph.edges().noneMatch(n -> n.getId().equals(outerClassName + "->" + innerClassName)) && weightedCouplingGraph.edges().noneMatch(n -> n.getId().equals(innerClassName + "->" + outerClassName))) {
-                            Edge e = weightedCouplingGraph.addEdge(outerClassName + "->" + innerClassName, outerClassName, innerClassName);
+                        // Ajoute une arête pondérée au graphe pour chaque couple de classes avec une métrique de couplage positive
+                        String edgeId = classNameA + "->" + classNameB;
+                        Edge e = weightedCouplingGraph.getEdge(edgeId);
+                        if (e == null) {
+                            e = weightedCouplingGraph.addEdge(edgeId, classNameA, classNameB);
                             e.setAttribute("ui.label", String.format("%.3f", couplingMetric));
                         }
-
                     }
-
                 }
             }
         }
 
+        // Configuration du style CSS pour les nœuds et les arêtes
+        setGraphStyle();
 
-        String css = "text-alignment: at-right; text-padding: 3px, 2px; text-background-mode: rounded-box; text-background-color: #EB2; text-color: #222;";
-
-        for (
-                Node node : this.weightedCouplingGraph.nodes().
-
-                collect(Collectors.toList())) {
-            //node.setAttribute("ui.style", "shape:circle; fill-color: cyan;size: 30px; text-alignment: center;");
-            node.setAttribute("ui.style", css);
-            node.setAttribute("ui.label", node.getId());
-            if (!node.neighborNodes().findAny().isPresent())
-                node.setAttribute("ui.hide");
-
-        }
-
-        for (
-                Edge edge : this.weightedCouplingGraph.edges().
-
-                collect(Collectors.toList())) {
-            edge.setAttribute("layout.weight", 20.0);
-        }
-
-        weightedCouplingGraph.setAttribute("ui.quality");
-        weightedCouplingGraph.setAttribute("ui.style", "padding: 10px;");
-
+        // Affiche le graphe
         weightedCouplingGraph.display();
     }
 
-    public void buildClusters() throws IOException {
-        Set<Cluster> clusters;
-        if (clusterer.getDendro() == null || clusterer.getDendro().isEmpty())
-            clusters = clusterer
-                    .buildClusters()
-                    .getDendro();
-        else
-            clusters = clusterer.getDendro();
-
-
-        int i = 0;
-        for (Cluster cluster : clusters) {
-            System.out.print("Cluster " + (++i) + " { " + (cluster.getAVGCoupling()) + " } [ ");
-            cluster.getClasses().forEach(c -> System.out.print(c + " "));
-            System.out.println("]");
-        }
-    }
-
-    public void identifyModules() throws IOException {
-        Set<Cluster> modules = clusterer.getIdentifiedModules();
-
-        int i = 0;
-        for (Cluster module : modules) {
-            System.out.print("Module " + (++i) + " { " + (module.getAVGCoupling()) + " } [ ");
-            module.getClasses().forEach(c -> System.out.print(c + " "));
-            System.out.println("]");
+    // Méthode pour configurer le style du graphe avec CSS
+    private void setGraphStyle() {
+        String css = "text-alignment: at-right; text-padding: 3px, 2px; text-background-mode: rounded-box; text-background-color: #EB2; text-color: #222;";
+        for (Node node : callGraph) {
+            node.setAttribute("ui.style", css);
         }
 
+        // Utilisez la méthode edges() pour itérer sur toutes les arêtes
+        for (Edge edge : callGraph.edges()) {
+            edge.setAttribute("layout.weight", 20.0);
+        }
 
+        callGraph.setAttribute("ui.quality");
+        callGraph.setAttribute("ui.style", "padding: 40px;");
     }
 
 }
