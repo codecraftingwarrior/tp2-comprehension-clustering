@@ -1,5 +1,4 @@
 package org.analysis.core;
-
 import org.analysis.clustering.Cluster;
 import org.analysis.clustering.ModuleClusterer;
 import org.graphstream.graph.Edge;
@@ -14,27 +13,20 @@ import java.util.stream.Collectors;
 import spoon.Launcher;
 import spoon.reflect.CtModel;
 import spoon.reflect.declaration.CtClass;
+import spoon.reflect.declaration.CtMethod;
+import spoon.reflect.reference.CtExecutableReference;
 import spoon.reflect.visitor.filter.TypeFilter;
 import spoon.reflect.code.CtInvocation;
 
 public class Analyzer {
 
-    // private static final String jrePath = "/usr/lib/jvm/java-11-openjdk-amd64";
-    private static final String jrePath = "/System/Library/Frameworks/JavaVM.framework/";
-    private Integer classCount = null, methodCount = null;
-
+    private final SingleGraph callGraph = new SingleGraph("Call Graph");
     private final SingleGraph weightedCouplingGraph = new SingleGraph("Coupling Graph");
-
-    private List<File> javaFiles = new ArrayList<>();
-
-    private List<String> javaFileNames = new ArrayList<>();
-
     private static Analyzer instance = null;
-
     private static ModuleClusterer clusterer;
-    private CtModel model;
+    private CtModel model; // Modèle Spoon pour l'AST
 
-
+    // Constructeur de l'analyseur qui initialise Spoon et construit le modèle AST
     private Analyzer(String projectUrl) {
         Launcher launcher = new Launcher();
         launcher.addInputResource(projectUrl);
@@ -42,6 +34,7 @@ public class Analyzer {
         model = launcher.getModel();
     }
 
+    // Méthode pour calculer la métrique de couplage entre deux classes utilisant Spoon
     public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
         CtClass<?> classA = (CtClass<?>) model.getAllTypes().stream()
                 .filter(type -> type instanceof CtClass<?> && type.getSimpleName().equals(classNameA))
@@ -79,6 +72,55 @@ public class Analyzer {
         return (double) (relationsAB + relationsBA) / totalRelations;
     }
 
+    public void buildCallGraph() {
+        // Utilisez le modèle pour trouver toutes les méthodes et leurs invocations
+        for (CtMethod<?> method : this.model.getElements(new TypeFilter<>(CtMethod.class))) {
+            String fullMethodName = getFullMethodName(method);
+
+            // Ajoutez le nœud pour la méthode courante s'il n'existe pas déjà
+            if (callGraph.getNode(fullMethodName) == null) {
+                callGraph.addNode(fullMethodName);
+            }
+
+            // Pour chaque invocation dans la méthode
+            for (CtInvocation<?> invocation : method.getElements(new TypeFilter<>(CtInvocation.class))) {
+                CtExecutableReference<?> executable = invocation.getExecutable();
+                if (executable.getDeclaringType() != null) {
+                    String invokedMethodName = getFullMethodName(executable);
+
+                    // Ajoutez le nœud pour la méthode invoquée s'il n'existe pas déjà
+                    if (callGraph.getNode(invokedMethodName) == null) {
+                        callGraph.addNode(invokedMethodName);
+                    }
+
+                    // Ajoutez l'arête entre la méthode courante et la méthode invoquée
+                    String edgeID = fullMethodName + "-" + invokedMethodName;
+                    if (callGraph.getEdge(edgeID) == null) {
+                        callGraph.addEdge(edgeID, fullMethodName, invokedMethodName);
+                    }
+                }
+            }
+        }
+    }
+
+    private String getFullMethodName(CtMethod<?> method) {
+        // Obtenez le nom de la classe déclarante
+        String className = method.getDeclaringType().getSimpleName();
+        // Obtenez le nom de la méthode
+        String methodName = method.getSimpleName();
+        // Concaténez-les pour obtenir un nom complet au format "NomClasse.nomMethod"
+        return className + "." + methodName;
+    }
+
+    private String getFullMethodName(CtExecutableReference<?> executable) {
+        // Obtenez le nom de la classe déclarante
+        String className = executable.getDeclaringType().getSimpleName();
+        // Obtenez le nom de la méthode
+        String methodName = executable.getSimpleName();
+        // Concaténez-les pour obtenir un nom complet au format "NomClasse.nomMethod"
+        return className + "." + methodName;
+    }
+
     public static String getDefaultProjectDirPath() {
         String projectPath = System.getProperty("user.dir");
 
@@ -103,8 +145,6 @@ public class Analyzer {
             return "";
         }
     }
-
-
 
     public float calculateCouplingMetric(Cluster cluster1, Cluster cluster2) throws IOException {
         float result = 0.0f;
