@@ -1,7 +1,6 @@
 package org.analysis;
 
 import org.analysis.cli.AbstractCLI;
-import org.analysis.cli.processor.IntegerInputProcessor;
 import org.analysis.core.Analyzer;
 
 import java.io.IOException;
