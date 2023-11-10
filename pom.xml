@@ -15,11 +15,7 @@
     </properties>
 
     <dependencies>
-        <dependency>
-            <groupId>org.eclipse.tycho</groupId>
-            <artifactId>org.eclipse.jdt.core</artifactId>
-            <version>3.9.1.v20130905-0837</version>
-        </dependency>
+
         <dependency>
             <groupId>org.graphstream</groupId>
             <artifactId>gs-core</artifactId>
@@ -64,6 +60,7 @@
             <artifactId>slf4j-simple</artifactId>
             <version>1.7.30</version>
         </dependency>
+
 
     </dependencies>
 

@@ -1,0 +1,12 @@
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/cli/AbstractCLI.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/cli/processor/DoubleInputProcessor.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/visitor/PackageVisitor.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/cli/processor/IntegerInputProcessor.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/cli/processor/NonZeroIntegerInputProcessor.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/visitor/MethodDeclarationVisitor.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/MainCLI.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/core/Analyzer.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/visitor/TypeDeclarationVisitor.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/cli/processor/ComplexInputProcessor.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/visitor/AttributeVisitor.java
+/Users/nathan/dev/Fac/tp2-comprehension-clustering/src/main/java/org/analysis/visitor/MethodInvocationVisitor.java
