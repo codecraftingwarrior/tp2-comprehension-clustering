@@ -1,5 +1,6 @@
 package org.analysis.core;
 
+import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.Edge;
 import org.graphstream.graph.implementations.SingleGraph;
@@ -8,6 +9,7 @@ import org.graphstream.ui.layout.springbox.implementations.LinLog;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import spoon.Launcher;
 import spoon.reflect.CtModel;
@@ -19,12 +21,12 @@ import spoon.reflect.code.CtInvocation;
 
 public class Analyzer {
 
-    private final SingleGraph callGraph = new SingleGraph("Call Graph");
-    private final SingleGraph weightedCouplingGraph = new SingleGraph("Coupling Graph");
+    private final Graph callGraph = new SingleGraph("Call Graph");
+    private final Graph weightedCouplingGraph = new SingleGraph("Coupling Graph");
     private CtModel model; // Modèle Spoon pour l'AST
 
     // Constructeur de l'analyseur qui initialise Spoon et construit le modèle AST
-    private Analyzer(String projectUrl) {
+     public Analyzer(String projectUrl) {
         Launcher launcher = new Launcher();
         launcher.addInputResource(projectUrl);
         launcher.buildModel();
@@ -166,17 +168,19 @@ public class Analyzer {
     // Méthode pour configurer le style du graphe avec CSS
     private void setGraphStyle() {
         String css = "text-alignment: at-right; text-padding: 3px, 2px; text-background-mode: rounded-box; text-background-color: #EB2; text-color: #222;";
-        for (Node node : callGraph) {
+        for (Node node : callGraph.nodes().collect(Collectors.toSet())) {
             node.setAttribute("ui.style", css);
+            node.setAttribute("ui.label", node.getId());
         }
 
-        // Utilisez la méthode edges() pour itérer sur toutes les arêtes
-        for (Edge edge : callGraph.edges()) {
+        for (Edge edge : callGraph.edges().collect(Collectors.toSet())) {
             edge.setAttribute("layout.weight", 20.0);
+            edge.setAttribute("ui.label", String.format("%.3f", edge.getNumber("weight")));
         }
 
         callGraph.setAttribute("ui.quality");
-        callGraph.setAttribute("ui.style", "padding: 40px;");
+        callGraph.setAttribute("ui.antialias");
+        callGraph.setAttribute("ui.stylesheet", "padding: 40px;");
     }
 
 }

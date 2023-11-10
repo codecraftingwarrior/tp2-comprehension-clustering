@@ -34,7 +34,7 @@ public class MainCLI extends AbstractCLI {
                 return;
             }
 
-            analyzer = Analyzer.getInstance(projectPath);
+            analyzer = new Analyzer(projectPath);
 
             for (int i = 0; i <= 5; i++)
                 validChoices.add(String.valueOf(i));
@@ -90,10 +90,10 @@ public class MainCLI extends AbstractCLI {
                 break;
 
             case "4":
-                analyzer.buildClusters();
+                // analyzer.buildClusters();
                 break;
             case "5":
-                analyzer.identifyModules();
+                // analyzer.identifyModules();
                 break;
         }
 
