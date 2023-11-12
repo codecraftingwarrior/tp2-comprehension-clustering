@@ -2,7 +2,6 @@ package org.analysis;
 
 import org.analysis.cli.AbstractCLI;
 import org.analysis.core.Analyzer;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,22 +12,26 @@ import java.util.Set;
 public class MainCLI extends AbstractCLI {
 
     private static Analyzer analyzer;
+    // Ensemble pour stocker les choix valides de l'utilisateur
     private static final Set<String> validChoices = new LinkedHashSet<>();
 
-    public MainCLI() {
-    }
+    public MainCLI() { }
 
     public static void main(String[] args) {
         init();
     }
 
+    // Initialisation de l'application
     private static void init() {
         try {
+            // Configuration de la bibliothèque graphstream pour l'interface utilisateur
             System.setProperty("org.graphstream.ui", "swing");
+            // Demande à l'utilisateur de fournir le chemin du projet à analyser
             System.out.printf("URL absolue de votre projet [%s] >>  ", Analyzer.getDefaultProjectDirPath());
             String projectPath = inputReader.readLine();
             Path path = Paths.get(projectPath);
 
+            // Vérification de l'existence du chemin saisi par l'utilisateur
             if (!Files.exists(path)) {
                 System.err.println("Le dossier est introuvable");
                 return;
@@ -36,9 +39,10 @@ public class MainCLI extends AbstractCLI {
 
             analyzer = Analyzer.getInstance(projectPath);
 
-            for (int i = 0; i <= 5; i++)
-                validChoices.add(String.valueOf(i));
+            // Remplissage de l'ensemble des choix valides
+            for (int i = 0; i <= 5; i++) validChoices.add(String.valueOf(i));
 
+            // Création et exécution de l'interface CLI
             MainCLI mainCLI = new MainCLI();
             mainCLI.run();
         } catch (InterruptedException | IOException e) {
@@ -46,6 +50,7 @@ public class MainCLI extends AbstractCLI {
         }
     }
 
+    // Affichage du menu principal
     @Override
     protected void mainMenu() {
         StringBuilder stringBuilder = new StringBuilder();
@@ -62,6 +67,7 @@ public class MainCLI extends AbstractCLI {
         System.out.println(stringBuilder);
     }
 
+    // Traite l'entrée utilisateur
     @Override
     protected void processUserInput(String userInput) throws IOException {
 
@@ -96,9 +102,9 @@ public class MainCLI extends AbstractCLI {
                 analyzer.identifyModules();
                 break;
         }
-
     }
 
+    // Gestion du choix 1 du menu principal
     private void handleChoice1() throws IOException {
         System.out.print("Nom de la classe A : ");
         String classNameA = inputReader.readLine();
