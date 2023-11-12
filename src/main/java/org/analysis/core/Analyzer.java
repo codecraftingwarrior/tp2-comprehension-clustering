@@ -20,31 +20,37 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+// Classe utilisé pour analyser le projet
 public class Analyzer {
+
+    // Chemins pour le projet et les sources Java, ainsi que le chemin JRE pour l'analyse
     private static String projectPath;
     private static String projectSourcePath;
-    // private static final String jrePath = "/usr/lib/jvm/java-11-openjdk-amd64";
     private static final String jrePath = "/System/Library/Frameworks/JavaVM.framework/";
+
+    // Compteurs pour les classes et méthodes
     private Integer classCount = null, methodCount = null;
 
+    // Structures de données pour maintenir les comptages par classe et par méthode
     private final Map<String, Integer> methodCountByClass = new LinkedHashMap<>();
-
     private final Map<String, Integer> attributeCountByClass = new LinkedHashMap<>();
-
     private final Map<String, Integer> LOCountByMethod = new LinkedHashMap<>();
 
+    // Graphes pour représenter les appels et le couplage entre les classes
     private final SingleGraph callGraph = new SingleGraph("Call Graph");
     private final SingleGraph weightedCouplingGraph = new SingleGraph("Coupling Graph");
 
+    // Listes pour stocker les fichiers Java et leurs noms
     private List<File> javaFiles = new ArrayList<>();
-
     private List<String> javaFileNames = new ArrayList<>();
 
+    // Instance unique de Analyzer pour le modèle Singleton
     private static Analyzer instance = null;
 
+    // Instance de ModuleClusterer pour l'identification des clusters
     private static ModuleClusterer clusterer;
 
-
+    // Constructeur privé pour empêcher l'instanciation directe
     private Analyzer(String projectUrl) {
         projectPath = projectUrl.isEmpty() ? getDefaultProjectDirPath() : projectUrl;
         projectSourcePath = projectPath + "/src";
@@ -57,32 +63,28 @@ public class Analyzer {
     }
 
     public static Analyzer getInstance(String projectPath) {
-        if (instance == null)
-            instance = new Analyzer(projectPath);
+        if (instance == null) instance = new Analyzer(projectPath);
 
         clusterer = new ModuleClusterer(instance);
         return instance;
     }
 
     public static Analyzer getInstance() {
-        if (instance == null)
-            throw new RuntimeException("Aucun singleton existant");
+        if (instance == null) throw new RuntimeException("Aucun singleton existant");
 
         return instance;
     }
 
-    public SingleGraph getCallGraph() {
-        return callGraph;
-    }
+    // Retourne le graphe d'appel
+    public SingleGraph getCallGraph() { return callGraph; }
 
-    public List<String> getJavaFileNames() {
-        return javaFileNames;
-    }
+    // Retourne la liste des noms de fichiers Java
+    public List<String> getJavaFileNames() { return javaFileNames; }
 
-    public List<File> getJavaFiles() {
-        return javaFiles;
-    }
+    // Retourne la liste des fichiers Java
+    public List<File> getJavaFiles() { return javaFiles; }
 
+    // Liste les fichiers Java dans un dossier
     private @NotNull ArrayList<File> listJavaFilesForFolder(final @NotNull File folder) {
         ArrayList<File> javaFiles = new ArrayList<>();
 
@@ -96,7 +98,7 @@ public class Analyzer {
         return javaFiles;
     }
 
-    // Création de l'AST
+    // Parse les sources Java pour créer l'AST
     private CompilationUnit parse(char[] classSource) {
         ASTParser parser = ASTParser.newParser(AST.JLS4); // java +1.6
         parser.setResolveBindings(true);
@@ -115,10 +117,10 @@ public class Analyzer {
         parser.setEnvironment(classpath, sources, new String[]{"UTF-8"}, true);
         parser.setSource(classSource);
 
-        return (CompilationUnit) parser.createAST(null); // create and parse
+        return (CompilationUnit) parser.createAST(null);
     }
 
-
+    // Construit et affiche le graphe d'appel
     public void buildAndShowCallGraph() throws IOException {
 
         buildCallGraph();
@@ -148,6 +150,7 @@ public class Analyzer {
 
     }
 
+    // Construit le graphe d'appel à partir des sources Java
     public void buildCallGraph() throws IOException {
         for (File fileEntry : javaFiles) {
             String content = FileUtils.readFileToString(fileEntry, StandardCharsets.UTF_8);
@@ -179,12 +182,11 @@ public class Analyzer {
                         }
                     }
                 }
-
             }
-
         }
     }
 
+    // Retourne le nom complet d'une méthode invoquée
     private String getFullMethodName(MethodInvocation mi) {
         if (mi.getExpression() != null)
             if (mi.getExpression().resolveTypeBinding() != null)
@@ -199,12 +201,14 @@ public class Analyzer {
         return mi.getName().toString();
     }
 
+    // Retourne le nom complet d'une déclaration de méthode
     private String getFullMethodName(MethodDeclaration method) {
         String className = method.resolveBinding().getDeclaringClass().getName();
 
         return className + "." + method.getName().toString();
     }
 
+    // Retourne le chemin par défaut du projet
     public static String getDefaultProjectDirPath() {
         String projectPath = System.getProperty("user.dir");
 
@@ -230,6 +234,7 @@ public class Analyzer {
         }
     }
 
+    // Calcule la métrique de couplage entre deux classes spécifiques
     public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
         int couplingCounter = 0;
 
@@ -250,6 +255,7 @@ public class Analyzer {
         return couplingCounter / totalCoupling;
     }
 
+    // Calcule la métrique de couplage entre deux clusters
     public float calculateCouplingMetric(Cluster cluster1, Cluster cluster2) throws IOException {
         float result = 0.0f;
 
@@ -260,6 +266,7 @@ public class Analyzer {
         return result;
     }
 
+    // Construit le graphe de couplage pondéré
     public void buildWeightedCouplingGraph() throws IOException {
         for (String javaFileName : javaFileNames) {
             String outerClassName = javaFileName.substring(0, javaFileName.lastIndexOf("."));
@@ -277,13 +284,10 @@ public class Analyzer {
                             Edge e = weightedCouplingGraph.addEdge(outerClassName + "->" + innerClassName, outerClassName, innerClassName);
                             e.setAttribute("ui.label", String.format("%.3f", couplingMetric));
                         }
-
                     }
-
                 }
             }
         }
-
 
         String css = "text-alignment: at-right; text-padding: 3px, 2px; text-background-mode: rounded-box; text-background-color: #EB2; text-color: #222;";
 
@@ -296,7 +300,6 @@ public class Analyzer {
             node.setAttribute("ui.label", node.getId());
             if (!node.neighborNodes().findAny().isPresent())
                 node.setAttribute("ui.hide");
-
         }
 
         for (
@@ -312,6 +315,7 @@ public class Analyzer {
         weightedCouplingGraph.display();
     }
 
+    // Construit des clusters à partir des métriques de couplage
     public void buildClusters() throws IOException {
         Set<Cluster> clusters;
         if (clusterer.getDendro() == null || clusterer.getDendro().isEmpty())
@@ -330,6 +334,7 @@ public class Analyzer {
         }
     }
 
+    // Identifie les modules à partir des clusters
     public void identifyModules() throws IOException {
         Set<Cluster> modules = clusterer.getIdentifiedModules();
 
@@ -339,8 +344,5 @@ public class Analyzer {
             module.getClasses().forEach(c -> System.out.print(c + " "));
             System.out.println("]");
         }
-
-
     }
-
 }
