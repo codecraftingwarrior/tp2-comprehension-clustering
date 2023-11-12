@@ -34,7 +34,7 @@ public class MainCLI extends AbstractCLI {
                 return;
             }
 
-            analyzer = new Analyzer(projectPath);
+            analyzer = Analyzer.getInstance(projectPath);
 
             for (int i = 0; i <= 5; i++)
                 validChoices.add(String.valueOf(i));
@@ -70,7 +70,7 @@ public class MainCLI extends AbstractCLI {
             return;
         }
 
-        if(!validChoices.contains(userInput)) {
+        if (!validChoices.contains(userInput)) {
             System.out.println("Valeur saisie incorrect, merci de réssayer !");
             System.out.println();
             return;
@@ -108,6 +108,6 @@ public class MainCLI extends AbstractCLI {
 
         double couplingWeight = analyzer.calculateCouplingMetric(classNameA, classNameB);
 
-        System.out.printf("Le couplage entre %s et %s vaut %f (%.2f%%). %n", classNameA, classNameB, couplingWeight, couplingWeight*100);
+        System.out.printf("Le couplage entre %s et %s vaut %f (%.2f%%). %n", classNameA, classNameB, couplingWeight, couplingWeight * 100);
     }
 }

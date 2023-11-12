@@ -15,6 +15,7 @@ import spoon.Launcher;
 import spoon.reflect.CtModel;
 import spoon.reflect.declaration.CtClass;
 import spoon.reflect.declaration.CtMethod;
+import spoon.reflect.declaration.CtType;
 import spoon.reflect.reference.CtExecutableReference;
 import spoon.reflect.visitor.filter.TypeFilter;
 import spoon.reflect.code.CtInvocation;
@@ -25,13 +26,33 @@ public class Analyzer {
     private final Graph weightedCouplingGraph = new SingleGraph("Coupling Graph");
     private CtModel model; // Modèle Spoon pour l'AST
 
+    private static String projectPath;
+    private static String projectSourcePath;
+
+    private static Analyzer instance = null;
+
     // Constructeur de l'analyseur qui initialise Spoon et construit le modèle AST
-     public Analyzer(String projectUrl) {
-        Launcher launcher = new Launcher();
-        launcher.addInputResource(projectUrl);
-        launcher.buildModel();
-        model = launcher.getModel();
-    }
+     private Analyzer(String projectUrl) {
+         projectPath = projectUrl.isEmpty() ? getDefaultProjectDirPath() : projectUrl;
+         projectSourcePath = projectPath + "/src";
+
+         Launcher launcher = new Launcher();
+         launcher.addInputResource(projectSourcePath);
+         launcher.getEnvironment().setAutoImports(true);
+         launcher.getEnvironment().setNoClasspath(true);
+         launcher.buildModel();
+
+         this.model = launcher.getModel();
+     }
+
+     public static Analyzer getInstance(String projectUrl) {
+        if(instance == null) {
+            instance = new Analyzer(projectUrl);
+            return instance;
+        }
+
+        return instance;
+     }
 
     // Méthode pour calculer la métrique de couplage entre deux classes utilisant Spoon
     public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
