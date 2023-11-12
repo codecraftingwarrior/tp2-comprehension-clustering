@@ -26,36 +26,43 @@ public class Analyzer {
     private final Graph weightedCouplingGraph = new SingleGraph("Coupling Graph");
     private CtModel model; // Modèle Spoon pour l'AST
 
+    private List<String> allTypes;
     private static String projectPath;
     private static String projectSourcePath;
-
     private static Analyzer instance = null;
 
     // Constructeur de l'analyseur qui initialise Spoon et construit le modèle AST
-     private Analyzer(String projectUrl) {
-         projectPath = projectUrl.isEmpty() ? getDefaultProjectDirPath() : projectUrl;
-         projectSourcePath = projectPath + "/src";
+    private Analyzer(String projectUrl) {
+        projectPath = projectUrl.isEmpty() ? getDefaultProjectDirPath() : projectUrl;
+        projectSourcePath = projectPath + "/src";
 
-         Launcher launcher = new Launcher();
-         launcher.addInputResource(projectSourcePath);
-         launcher.getEnvironment().setAutoImports(true);
-         launcher.getEnvironment().setNoClasspath(true);
-         launcher.buildModel();
+        Launcher launcher = new Launcher();
+        launcher.addInputResource(projectSourcePath);
+        launcher.getEnvironment().setAutoImports(true);
+        launcher.getEnvironment().setNoClasspath(true);
+        launcher.buildModel();
 
-         this.model = launcher.getModel();
-     }
+        this.model = launcher.getModel();
 
-     public static Analyzer getInstance(String projectUrl) {
-        if(instance == null) {
+        allTypes = this
+                .model
+                .getAllTypes()
+                .stream()
+                .map(CtType::getSimpleName)
+                .collect(Collectors.toList());
+    }
+
+    public static Analyzer getInstance(String projectUrl) {
+        if (instance == null) {
             instance = new Analyzer(projectUrl);
             return instance;
         }
 
         return instance;
-     }
+    }
 
     // Méthode pour calculer la métrique de couplage entre deux classes utilisant Spoon
-    public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
+   /* public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
         CtClass<?> classA = (CtClass<?>) model.getAllTypes().stream()
                 .filter(type -> type instanceof CtClass<?> && type.getSimpleName().equals(classNameA))
                 .findFirst()
@@ -90,33 +97,67 @@ public class Analyzer {
                 .count();
 
         return (double) (relationsAB + relationsBA) / totalRelations;
+    }*/
+
+    public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
+        int couplingCounter = 0;
+
+        if (!this.callGraph.nodes().findAny().isPresent())
+            buildCallGraph();
+
+        float totalCoupling = callGraph.edges().count();
+
+        for (Edge e : callGraph.edges().collect(Collectors.toList()))
+            if (
+                    (e.getNode0().getId().startsWith(classNameA + ".")
+                            && e.getNode1().getId().startsWith(classNameB + "."))
+                            ||
+                            (e.getNode0().getId().startsWith(classNameB + ".")
+                                    && e.getNode1().getId().startsWith(classNameA + ".")))
+                couplingCounter++;
+
+        return couplingCounter / totalCoupling;
     }
 
     // Méthode pour construire et afficher le graphe d'appel basé sur les informations fournies par Spoon
     public void buildAndShowCallGraph() {
 
-        // Construis le graphe d'appel en utilisant Spoon
-        for (CtMethod<?> method : model.getElements(new TypeFilter<>(CtMethod.class))) {
-            String methodName = method.getSignature();
-            Node methodNode = callGraph.addNode(methodName);
-            methodNode.setAttribute("ui.label", methodName);
-
-            for (CtInvocation<?> invocation : method.getElements(new TypeFilter<>(CtInvocation.class))) {
-                CtExecutableReference<?> executable = invocation.getExecutable();
-                if (executable.getDeclaringType() != null) {
-                    String invokedMethodName = executable.getDeclaringType().getSimpleName() + "." + executable.getSimpleName();
-                    Node invokedNode = callGraph.addNode(invokedMethodName);
-                    invokedNode.setAttribute("ui.label", invokedMethodName);
-                    callGraph.addEdge(methodName + "->" + invokedMethodName, methodNode, invokedNode, true);
-                }
-            }
-        }
+        buildCallGraph();
 
         // Applique les styles CSS aux nœuds et aux arêtes
         setGraphStyle();
 
         // Affiche le graphe avec un layout automatique
         callGraph.display().enableAutoLayout(new LinLog());
+    }
+
+    private void buildCallGraph() {
+        // Construis le graphe d'appel en utilisant Spoon
+        for (CtMethod<?> method : model.getElements(new TypeFilter<>(CtMethod.class))) {
+
+            for (CtInvocation<?> invocation : method.getElements(new TypeFilter<>(CtInvocation.class))) {
+                CtExecutableReference<?> executable = invocation.getExecutable();
+                if (executable.getDeclaringType() != null && allTypes.contains(executable.getDeclaringType().getSimpleName())) {
+                    String invokedMethodName = executable.getDeclaringType().getSimpleName() + "." + executable.getSimpleName();
+                    Node invokedNode = null;
+                    if (callGraph.getNode(invokedMethodName) == null) {
+                        invokedNode = callGraph.addNode(invokedMethodName);
+                        invokedNode.setAttribute("ui.label", invokedMethodName);
+
+                    }
+
+                    String methodID = method.getDeclaringType().getSimpleName() + "." + method.getSimpleName();
+                    Node methodNode = null;
+                    if (callGraph.getNode(methodID) == null) {
+                        methodNode = callGraph.addNode(methodID);
+                        methodNode.setAttribute("ui.label", methodID);
+                    }
+
+                    if (callGraph.getEdge(methodID + "->" + invokedMethodName) == null)
+                        callGraph.addEdge(methodID + "->" + invokedMethodName, methodID, invokedMethodName, true);
+                }
+            }
+        }
     }
 
     public static String getDefaultProjectDirPath() {
@@ -148,29 +189,35 @@ public class Analyzer {
         // Parcours toutes les classes du modèle Spoon
         List<CtClass<?>> allClasses = model.getElements(new TypeFilter<>(CtClass.class));
 
-        // Ajoute tous les nœuds au graphe, un pour chaque classe
-        allClasses.forEach(ctClass -> {
-            String className = ctClass.getSimpleName();
-            if (weightedCouplingGraph.getNode(className) == null) {
-                weightedCouplingGraph.addNode(className);
-            }
-        });
-
         // Calcule la métrique de couplage pour chaque paire de classes
         for (CtClass<?> classA : allClasses) {
             for (CtClass<?> classB : allClasses) {
                 if (!classA.equals(classB)) {
-                    String classNameA = classA.getSimpleName();
-                    String classNameB = classB.getSimpleName();
+                    String classNameA = classA.getQualifiedName();
+                    String classNameB = classB.getQualifiedName();
 
                     // Utilise la méthode existante pour calculer la métrique de couplage entre deux classes
-                    float couplingMetric = (float) calculateCouplingMetric(classNameA, classNameB);
+                    float couplingMetric = (float) calculateCouplingMetric(classA.getSimpleName(), classB.getSimpleName());
 
                     if (couplingMetric > 0) {
                         // Ajoute une arête pondérée au graphe pour chaque couple de classes avec une métrique de couplage positive
+                        if (weightedCouplingGraph.getNode(classNameA) == null) {
+                            Node aNode = weightedCouplingGraph.addNode(classNameA);
+                            aNode.setAttribute("ui.label", classNameA);
+                        }
+
+                        if (weightedCouplingGraph.getNode(classNameB) == null) {
+                            Node bNode = weightedCouplingGraph.addNode(classNameB);
+                            bNode.setAttribute("ui.label", classNameB);
+                        }
+
                         String edgeId = classNameA + "->" + classNameB;
+                        String edgeIdSym = classNameB + "->" + classNameA;
+
                         Edge e = weightedCouplingGraph.getEdge(edgeId);
-                        if (e == null) {
+                        Edge eSym = weightedCouplingGraph.getEdge(edgeIdSym);
+
+                        if (e == null && eSym == null) {
                             e = weightedCouplingGraph.addEdge(edgeId, classNameA, classNameB);
                             e.setAttribute("ui.label", String.format("%.3f", couplingMetric));
                         }
@@ -180,9 +227,29 @@ public class Analyzer {
         }
 
         // Configuration du style CSS pour les nœuds et les arêtes
-        setGraphStyle();
+        String css = "text-alignment: at-right; text-padding: 3px, 2px; text-background-mode: rounded-box; text-background-color: #EB2; text-color: #222;";
 
-        // Affiche le graphe
+        for (
+                Node node : this.weightedCouplingGraph.nodes().
+
+                collect(Collectors.toList())) {
+            //node.setAttribute("ui.style", "shape:circle; fill-color: cyan;size: 30px; text-alignment: center;");
+            node.setAttribute("ui.style", css);
+            node.setAttribute("ui.label", node.getId());
+            if (!node.neighborNodes().findAny().isPresent())
+                node.setAttribute("ui.hide");
+        }
+
+        for (
+                Edge edge : this.weightedCouplingGraph.edges().
+
+                collect(Collectors.toList())) {
+            edge.setAttribute("layout.weight", 20.0);
+        }
+
+        weightedCouplingGraph.setAttribute("ui.quality");
+        weightedCouplingGraph.setAttribute("ui.style", "padding: 10px;");
+
         weightedCouplingGraph.display();
     }
 
@@ -201,7 +268,6 @@ public class Analyzer {
 
         callGraph.setAttribute("ui.quality");
         callGraph.setAttribute("ui.antialias");
-        callGraph.setAttribute("ui.stylesheet", "padding: 40px;");
     }
 
 }
