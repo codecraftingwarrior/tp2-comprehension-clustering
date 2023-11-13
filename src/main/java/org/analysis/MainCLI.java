@@ -90,7 +90,7 @@ public class MainCLI extends AbstractCLI {
                 break;
 
             case "4":
-                // analyzer.buildClusters();
+                analyzer.buildClusters();
                 break;
             case "5":
                 // analyzer.identifyModules();

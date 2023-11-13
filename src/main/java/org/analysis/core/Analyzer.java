@@ -1,5 +1,8 @@
 package org.analysis.core;
 
+import org.analysis.clustering.Cluster;
+import org.analysis.clustering.Dendrogram;
+import org.analysis.clustering.HierarchicalClusterer;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.Edge;
@@ -25,6 +28,8 @@ public class Analyzer {
     private final Graph callGraph = new SingleGraph("Call Graph");
     private final Graph weightedCouplingGraph = new SingleGraph("Coupling Graph");
     private CtModel model; // Modèle Spoon pour l'AST
+
+    private static HierarchicalClusterer clusterer;
 
     private List<String> allTypes;
     private static String projectPath;
@@ -53,11 +58,10 @@ public class Analyzer {
     }
 
     public static Analyzer getInstance(String projectUrl) {
-        if (instance == null) {
+        if (instance == null)
             instance = new Analyzer(projectUrl);
-            return instance;
-        }
 
+        clusterer = new HierarchicalClusterer(instance);
         return instance;
     }
 
@@ -99,7 +103,7 @@ public class Analyzer {
         return (double) (relationsAB + relationsBA) / totalRelations;
     }*/
 
-    public double calculateCouplingMetric(String classNameA, String classNameB) throws IOException {
+    public double calculateCouplingMetric(String classNameA, String classNameB) {
         int couplingCounter = 0;
 
         if (!this.callGraph.nodes().findAny().isPresent())
@@ -117,6 +121,16 @@ public class Analyzer {
                 couplingCounter++;
 
         return couplingCounter / totalCoupling;
+    }
+
+    public double calculateCouplingMetric(Cluster cluster1, Cluster cluster2) {
+        float result = 0.0f;
+
+        for (String classNameA : cluster1.getClasses())
+            for (String classNameB : cluster2.getClasses())
+                result += calculateCouplingMetric(classNameA, classNameB);
+
+        return result;
     }
 
     // Méthode pour construire et afficher le graphe d'appel basé sur les informations fournies par Spoon
@@ -268,6 +282,12 @@ public class Analyzer {
 
         callGraph.setAttribute("ui.quality");
         callGraph.setAttribute("ui.antialias");
+    }
+
+
+    public void buildClusters() {
+        Dendrogram dendrogram = clusterer.doClusteringFor(allTypes);
+        dendrogram.print();
     }
 
 }
