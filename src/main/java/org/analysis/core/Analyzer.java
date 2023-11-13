@@ -1,8 +1,10 @@
 package org.analysis.core;
 
+import org.analysis.cli.processor.DoubleInputProcessor;
 import org.analysis.clustering.Cluster;
 import org.analysis.clustering.Dendrogram;
 import org.analysis.clustering.HierarchicalClusterer;
+import org.analysis.clustering.ModuleGenerator;
 import org.graphstream.graph.Graph;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.Edge;
@@ -30,6 +32,10 @@ public class Analyzer {
     private CtModel model; // Modèle Spoon pour l'AST
 
     private static HierarchicalClusterer clusterer;
+
+    private static ModuleGenerator moduleGenerator;
+
+    private Dendrogram dendrogram;
 
     private List<String> allTypes;
     private static String projectPath;
@@ -286,8 +292,24 @@ public class Analyzer {
 
 
     public void buildClusters() {
-        Dendrogram dendrogram = clusterer.doClusteringFor(allTypes);
+        dendrogram = clusterer.doClusteringFor(allTypes);
         dendrogram.print();
+    }
+
+    public void generateAndShowModules() throws IOException {
+        if (dendrogram == null || dendrogram.isEmpty())
+            buildClusters();
+
+        DoubleInputProcessor processor = new DoubleInputProcessor("Saisir la valeur de CP >> ");
+        double couplingThreshold = processor.process();
+
+        moduleGenerator = new ModuleGenerator(dendrogram, allTypes, couplingThreshold, instance);
+
+        int index = 1;
+        for(Cluster cluster: moduleGenerator.getIdentifiedModules()) {
+            System.out.println("Cluster " + index + " : " + cluster.getName());
+            index++;
+        }
     }
 
 }

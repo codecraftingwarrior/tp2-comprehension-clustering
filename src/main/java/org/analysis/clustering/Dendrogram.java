@@ -32,7 +32,11 @@ public class Dendrogram {
         if (rootCluster == null)
             throw new RuntimeException("The root cluster was not initialized");
 
-        System.out.println("Clustering Tree : ");
+        System.out.println("\nClustering Tree : ");
         System.out.println(rootCluster.getName());
+    }
+
+    public boolean isEmpty() {
+        return this.history.isEmpty();
     }
 }

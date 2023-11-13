@@ -93,7 +93,7 @@ public class MainCLI extends AbstractCLI {
                 analyzer.buildClusters();
                 break;
             case "5":
-                // analyzer.identifyModules();
+                analyzer.generateAndShowModules();
                 break;
         }
 

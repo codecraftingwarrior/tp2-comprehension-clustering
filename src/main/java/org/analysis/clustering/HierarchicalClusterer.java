@@ -15,6 +15,10 @@ public class HierarchicalClusterer {
     }
 
     public Dendrogram doClusteringFor(List<String> classNames) {
+
+        System.out.println("Démmarage du processus de clustering ......");
+        System.out.println("Clustering en cours ........");
+
         // Initialiser chaque classe comme un cluster
         List<Cluster> clusters = new ArrayList<>();
         for (String className : classNames) {
