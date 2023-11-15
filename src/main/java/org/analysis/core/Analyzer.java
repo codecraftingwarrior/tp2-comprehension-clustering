@@ -10,7 +10,6 @@ import org.graphstream.graph.Edge;
 import org.graphstream.graph.Node;
 import org.graphstream.graph.implementations.SingleGraph;
 import org.graphstream.ui.layout.springbox.implementations.LinLog;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -85,7 +84,7 @@ public class Analyzer {
     public List<File> getJavaFiles() { return javaFiles; }
 
     // Liste les fichiers Java dans un dossier
-    private @NotNull ArrayList<File> listJavaFilesForFolder(final @NotNull File folder) {
+    private ArrayList<File> listJavaFilesForFolder(final File folder) {
         ArrayList<File> javaFiles = new ArrayList<>();
 
         for (File fileEntry : Objects.requireNonNull(folder.listFiles())) {
@@ -328,7 +327,7 @@ public class Analyzer {
 
         int i = 0;
         for (Cluster cluster : clusters) {
-            System.out.print("Cluster " + (++i) + " { " + (cluster.getAVGCoupling()) + " } [ ");
+            System.out.print("Cluster " + (++i) + " [ ");
             cluster.getClasses().forEach(c -> System.out.print(c + " "));
             System.out.println("]");
         }
