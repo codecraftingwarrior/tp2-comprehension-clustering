@@ -307,7 +307,7 @@ public class Analyzer {
 
         int index = 1;
         for(Cluster cluster: moduleGenerator.getIdentifiedModules()) {
-            System.out.println("Cluster " + index + " : " + cluster.getName());
+            System.out.println("Module { " + cluster.getName() + " }");
             index++;
         }
     }
